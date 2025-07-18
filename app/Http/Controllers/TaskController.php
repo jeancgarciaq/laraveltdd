@@ -5,19 +5,14 @@ namespace App\Http\Controllers;
 // Importa el modelo
 use App\Models\Task; 
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreTaskRequest;
 
 class TaskController extends Controller
 {
-    public function store(Request $request)
+    public function store(StoreTaskRequest $request)
     {
-        // Validación básica para que la prueba pase
-        $request->validate([
-            'title' => 'required|max:255',
-            'description' => 'nullable',
-        ]);
-
-        // Crear la tarea
-        Task::create($request->all());
+        // Usa validated() para obtener solo los datos validados
+        Task::create($request->validated());
 
         // Redirigir para que la prueba pase
         return redirect('/tasks');
