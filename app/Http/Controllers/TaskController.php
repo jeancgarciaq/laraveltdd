@@ -15,7 +15,7 @@ class TaskController extends Controller
         Task::create($request->validated());
 
         // Redirigir para que la prueba pase
-        return redirect('/tasks');
+        return redirect()->route('tasks.index');
     }
 
     public function index()

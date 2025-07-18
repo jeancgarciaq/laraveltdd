@@ -7,6 +7,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::post('/tasks', [TaskController::class, 'store']);
-// Necesario para la redirección
-Route::get('/tasks', [TaskController::class, 'index']);
+// Utilizando el helper Route
+Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
+Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
