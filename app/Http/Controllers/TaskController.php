@@ -20,7 +20,9 @@ class TaskController extends Controller
 
     public function index()
     {
-        // Por ahora, solo una vista vacía para que la redirección funcione
-        return view('tasks.index');
+        // Obtener todas las tareas
+        $tasks = Task::all();
+        // Pasar las tareas a la vista
+        return view('tasks.index', compact('tasks'));
     }
 }

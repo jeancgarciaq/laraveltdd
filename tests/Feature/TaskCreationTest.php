@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
+use App\Models\Task;
 
 class TaskCreationTest extends TestCase
 {
@@ -34,4 +35,21 @@ class TaskCreationTest extends TestCase
         $response->assertRedirect('/tasks');
     }
 
+    /** @test */
+    public function a_user_can_view_all_tasks()
+    {
+        // 1. Crear algunas tareas en la base de datos
+        // Usamos el factory de Laravel para crear datos de prueba fácilmente
+        Task::factory()->create(['title' => 'First Task', 'description' => 'Description 1']);
+        Task::factory()->create(['title' => 'Second Task', 'description' => 'Description 2']);
+
+        // 2. Simular una petición GET a la rutas /tasks
+        $response = $this->get('/tasks');
+
+        // 3. Verificar que la respuesta contiene las tareas
+        // Verificar que la petición fue exitosa (código 200)
+        $response->assertOk();
+        $response->assertSee('First Task');
+        $response->assertSee('Second Task');
+    }
 }
