@@ -2,142 +2,149 @@
 
 namespace Tests\Feature;
 
-use App\Models\Category; // Asumimos un modelo Category
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
+/**
+ * Pruebas de funcionalidad para la creación de productos
+ *
+ * @package Tests\Feature
+ * @author Jean Carlo Garcia
+ * @version 1.0.0
+ * @since Laravel 12
+ */
 class ProductCreationTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function an_authenticated_user_can_create_a_product_with_valid_data()
+    public function an_authenticated_user_can_create_a_product_with_valid_data(): void
     {
-        // 1. Arrange: Crear y autenticar un usuario, y una categoría.
         $user = User::factory()->create();
-        $category = Category::factory()->create(); // Necesitamos una categoría existente para la validación 'exists'
-        $this->actingAs($user);
+        $category = Category::factory()->create();
 
-        // 2. Act: Simular una petición POST para crear un producto con datos válidos.
-        $response = $this->post('/products', [
+        $response = $this->actingAs($user)->post(route('products.store'), [
             'name' => 'Laptop Pro X',
             'price' => 1299.99,
             'description' => 'Powerful and sleek laptop for professionals.',
             'category_id' => $category->id,
         ]);
 
-        // 3. Assert:
-        // Verificar que el producto fue almacenado en la base de datos.
+        $response->assertSessionHasNoErrors();
+        
         $this->assertDatabaseHas('products', [
             'name' => 'Laptop Pro X',
             'price' => 1299.99,
             'category_id' => $category->id,
         ]);
-        $this->assertCount(1, Product::all()); // Asegurarse de que solo se creó 1 producto
-
-        // Verificar la redirección y el mensaje de éxito.
+        
+        $this->assertCount(1, Product::all());
+        
         $response->assertRedirect(route('products.index'));
         $response->assertSessionHas('success', 'Producto creado exitosamente.');
     }
 
     #[Test]
-    public function a_product_requires_a_name()
+    public function a_product_requires_a_name(): void
     {
         $user = User::factory()->create();
         $category = Category::factory()->create();
-        $this->actingAs($user);
 
-        $response = $this->post('/products', [
-            'name' => '', // Falla: nombre vacío
+        $response = $this->actingAs($user)->post(route('products.store'), [
+            'name' => '',
             'price' => 10.00,
             'description' => 'Some description',
             'category_id' => $category->id,
         ]);
 
-        $response->assertSessionHasErrors('name'); // Esperamos error para 'name'
-        $this->assertDatabaseCount('products', 0); // No se debe guardar nada
+        $response->assertSessionHasErrors('name');
+        $this->assertDatabaseCount('products', 0);
     }
 
     #[Test]
-    public function a_product_name_must_be_unique()
+    public function a_product_name_must_be_unique(): void
     {
         $user = User::factory()->create();
         $category = Category::factory()->create();
-        $this->actingAs($user);
 
-        // Crear un producto existente con el mismo nombre.
-        Product::factory()->create(['name' => 'Existing Product']);
+        // ✅ Crear producto existente asociado a la categoría
+        Product::factory()->create([
+            'name' => 'Existing Product',
+            'category_id' => $category->id
+        ]);
 
-        $response = $this->post('/products', [
-            'name' => 'Existing Product', // Falla: nombre duplicado
+        $response = $this->actingAs($user)->post(route('products.store'), [
+            'name' => 'Existing Product',
             'price' => 20.00,
             'description' => 'Another product',
             'category_id' => $category->id,
         ]);
 
-        $response->assertSessionHasErrors('name'); // Esperamos error para 'name'
-        $this->assertDatabaseCount('products', 1); // Solo debe haber 1 producto (el existente)
+        $response->assertSessionHasErrors('name');
+        $this->assertDatabaseCount('products', 1);
     }
 
     #[Test]
-    public function a_product_requires_a_valid_price()
+    public function a_product_requires_a_valid_price(): void
     {
         $user = User::factory()->create();
         $category = Category::factory()->create();
-        $this->actingAs($user);
 
-        // Intento 1: Precio no numérico
-        $response = $this->post('/products', [
+        // Precio no numérico
+        $response = $this->actingAs($user)->post(route('products.store'), [
             'name' => 'Test Product',
-            'price' => 'abc', // Falla: no numérico
+            'price' => 'abc',
             'description' => 'Description',
             'category_id' => $category->id,
         ]);
+        
         $response->assertSessionHasErrors('price');
         $this->assertDatabaseCount('products', 0);
 
-        // Intento 2: Precio menor a 0.01
-        $response = $this->post('/products', [
+        // Precio menor a 0.01
+        $response = $this->actingAs($user)->post(route('products.store'), [
             'name' => 'Test Product 2',
-            'price' => 0.00, // Falla: menor a 0.01
+            'price' => 0.00,
             'description' => 'Description 2',
             'category_id' => $category->id,
         ]);
+        
         $response->assertSessionHasErrors('price');
         $this->assertDatabaseCount('products', 0);
     }
 
     #[Test]
-    public function a_product_requires_an_existing_category()
+    public function a_product_requires_an_existing_category(): void
     {
         $user = User::factory()->create();
-        $this->actingAs($user);
 
-        $response = $this->post('/products', [
+        $response = $this->actingAs($user)->post(route('products.store'), [
             'name' => 'Product without Category',
             'price' => 50.00,
             'description' => 'Description',
-            'category_id' => 999, // Falla: ID de categoría no existente
+            'category_id' => 999,
         ]);
 
-        $response->assertSessionHasErrors('category_id'); // Esperamos error para 'category_id'
+        $response->assertSessionHasErrors('category_id');
         $this->assertDatabaseCount('products', 0);
     }
 
     #[Test]
-    public function guests_cannot_create_products()
+    public function guests_cannot_create_products(): void
     {
         $category = Category::factory()->create();
-        $response = $this->post('/products', [
+        
+        $response = $this->post(route('products.store'), [
             'name' => 'Unauthorized Product',
             'price' => 100.00,
             'category_id' => $category->id,
         ]);
 
-        $response->assertStatus(302);
-        $response->assertRedirect('/login');
+        $response->assertRedirect(route('login'));
         $this->assertDatabaseCount('products', 0);
     }
 }
