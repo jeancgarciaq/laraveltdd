@@ -13,7 +13,7 @@ class TaskPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true; // ✅ Allow authenticated users to view their tasks
     }
 
     /**
