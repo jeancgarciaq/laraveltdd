@@ -1,5 +1,5 @@
 <?php
-// tests/Feature/TaskManagementTest.php
+
 namespace Tests\Feature;
 
 use App\Models\Task;
@@ -13,28 +13,101 @@ class TaskManagementTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function a_user_can_delete_their_own_task_and_is_redirected()
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->for($user)->create();
+
+        $this->assertDatabaseHas('tasks', ['id' => $task->id]);
+
+        $response = $this->actingAs($user)->delete(route('tasks.destroy', $task));
+
+        $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
+        $response->assertRedirect(route('tasks.index'));
+        $response->assertSessionHas('success', 'Task deleted successfully!');
+    }
+
+    #[Test]
+    public function a_task_update_requires_a_title()
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->for($user)->create([
+            'title' => 'Initial Title',
+            'description' => 'Initial Description',
+        ]);
+
+        $response = $this->actingAs($user)->put(route('tasks.update', $task), [
+            'title' => '',
+            'description' => 'Updated Description',
+        ]);
+
+        $response->assertSessionHasErrors('title');
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Initial Title',
+        ]);
+        $this->assertDatabaseMissing('tasks', ['title' => '']);
+    }
+
+    #[Test]
     public function a_user_cannot_update_another_users_task()
     {
-        // 1. Arrange:
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
-        $taskUser2 = Task::factory()->for($user2)->create();
+        $taskOfUser1 = Task::factory()->for($user1)->create();
+        $taskOfUser2 = Task::factory()->for($user2)->create();
 
-        // 2. Act: Autenticar como user1 e intentar actualizar la tarea de user2.
-        // ¡Esta línea es clave y debe estar aquí!
-        $response = $this->actingAs($user1)->put(route('tasks.update', $taskUser2), [
-            'title'         => 'Attempted update by other user',
-            'description'   => 'This should fail',
+        $response = $this->actingAs($user1)->put(route('tasks.update', $taskOfUser2), [
+            'title' => 'Attempted update by other user',
+            'description' => 'This should fail',
         ]);
 
-        // 3. Assert: Esperar un error de autorización (403 Forbidden).
-        $response->assertStatus(403);
+        $response->assertStatus(403); // ✅ Fixed
 
-        // 4. Asegurarse de que la tarea de user2 no fue modificada en la BD.
         $this->assertDatabaseHas('tasks', [
-            'id'            => $taskUser2->id,
-            'title'         => $taskUser2->title,
-            'description'   => $taskUser2->description,
+            'id' => $taskOfUser2->id,
+            'title' => $taskOfUser2->title,
         ]);
+        $this->assertDatabaseMissing('tasks', ['title' => 'Attempted update by other user']);
+    }
+
+    #[Test]
+    public function a_user_cannot_delete_another_users_task()
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+        $taskOfUser2 = Task::factory()->for($user2)->create();
+
+        $response = $this->actingAs($user1)->delete(route('tasks.destroy', $taskOfUser2));
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('tasks', ['id' => $taskOfUser2->id]);
+    }
+
+
+    #[Test]
+    public function an_authenticated_user_can_view_the_edit_task_page_for_their_own_task()
+    {
+        $user = User::factory()->create();
+        $task = Task::factory()->for($user)->create();
+
+        $response = $this->actingAs($user)->get(route('tasks.edit', $task));
+
+        $response->assertOk(); // Debería cargar la página
+        $response->assertSee('Edit Task'); // Verificar que el título de la página está presente
+        $response->assertSee($task->title); // Verificar que el título de la tarea está en el formulario
+    }
+
+    #[Test]
+    public function a_user_cannot_view_the_edit_task_page_for_another_users_task()
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+        $taskOfUser2 = Task::factory()->for($user2)->create();
+
+        $response = $this->actingAs($user1)->get(route('tasks.edit', $taskOfUser2));
+
+        $response->assertForbidden(); // Debe denegar el acceso (403)
     }
 }
