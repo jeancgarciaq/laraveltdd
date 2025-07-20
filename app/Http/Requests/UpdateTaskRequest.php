@@ -4,12 +4,13 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreTaskRequest extends FormRequest
+class UpdateTaskRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Permitir que cualquiera cree una tarea por ahora
-        return true; 
+        // La autorización para actualizar se maneja en el controlador con el middleware 'can'.
+        // Aquí solo nos preocupamos si el usuario está autenticado.
+        return true;
     }
 
     public function rules(): array
