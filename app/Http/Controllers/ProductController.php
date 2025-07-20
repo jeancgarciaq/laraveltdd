@@ -3,7 +3,23 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
+use App\Models\Product;
+use App\Models\Category;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
+/**
+ * Controlador para la gestión de productos
+ *
+ * Maneja todas las operaciones CRUD para productos con autorización automática.
+ *
+ * @package App\Http\Controllers
+ * @author Jean Carlo Garcia <jeancgarciaq@example.com>
+ * @version 1.0.0
+ * @since Laravel 12
+ */
 class ProductController extends Controller
 {
     /**
@@ -16,66 +32,97 @@ class ProductController extends Controller
      */
     public function __construct()
     {
-        $this->authorizeResource(Product::class, 'product')->except(['index', 'show']);
+        $this->authorizeResource(Product::class, 'product');
     }
 
     /**
-     * Display a listing of the resource.
+     * Muestra la lista de productos
+     *
+     * @return View
      */
-    public function index()
+    public function index(): View
     {
         $products = Product::with('category')->get();
         return view('products.index', compact('products'));
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Muestra el formulario para crear un nuevo producto
+     *
+     * @return View
      */
-    public function create()
+    public function create(): View
     {
-        return view('products.create');
+        $categories = Category::all(); // Obtener categorías para el formulario
+        return view('products.create', compact('categories'));
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Almacena un nuevo producto en la base de datos
+     *
+     * @param StoreProductRequest $request 
+     * @return RedirectResponse
      */
-    public function store(Request $request)
+    public function store(StoreProductRequest $request): RedirectResponse
     {
         Product::create($request->validated());
-        return redirect()->route('products.index')->with('success', 'Producto creado exitosamente.');
+        return redirect()
+            ->route('products.index')
+            ->with('success', 'Producto creado exitosamente.');
     }
 
     /**
-     * Display the specified resource.
+     * Muestra un producto específico
+     *
+     * @param Product $product
+     * @return View
      */
-    public function show(string $id)
+    public function show(Product $product): View
     {
         return view('products.show', compact('product'));
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Muestra el formulario para editar un producto
+     *
+     * @param Product $product
+     * @return View
      */
-    public function edit(string $id)
+    public function edit(Product $product): View
     {
-        return view('products.edit', compact('product'));
+        $categories = Category::all(); // Obtener categorías para el formulario
+        return view('products.edit', compact('product', 'categories'));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Actualiza un producto existente en la base de datos
+     *
+     * @param UpdateProductRequest $request
+     * @param Product $product 
+     * @return RedirectResponse
      */
-    public function update(UpdateProductRequest $request, string $id)
+    public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
-        $product->update($request->only(['name', 'price', 'description']));
-        return redirect()->route('products.index')->with('success', 'Product updated successfully!');
+        // ✅ Corregido: incluir category_id en la actualización
+        $product->update($request->validated());
+        
+        return redirect()
+            ->route('products.index')
+            ->with('success', 'Producto actualizado exitosamente.');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Elimina un producto de la base de datos
+     *
+     * @param Product $product 
+     * @return RedirectResponse
      */
-    public function destroy(string $id)
+    public function destroy(Product $product): RedirectResponse
     {
-        $task->delete();
-        return redirect()->route('products.index')->with('success', 'Product deleted successfully!');
+        $product->delete();
+        
+        return redirect()
+            ->route('products.index')
+            ->with('success', 'Producto eliminado exitosamente.');
     }
 }
