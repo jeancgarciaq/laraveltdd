@@ -19,4 +19,12 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'title.required' => 'The title field is required.',
+            'title.max' => 'The title may not be greater than 255 characters.',
+        ];
+    }
 }
