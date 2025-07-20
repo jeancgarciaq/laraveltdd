@@ -18,10 +18,10 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->unique()->sentence(2),
-            'price' => $this->faker->randomFloat(2, 0.01, 1000),
-            'description' => $this->faker->paragraph(),
-            'category_id' => Category::factory(), // Asocia a una categoría
+            'name' => fake()->unique()->words(3, true), // ✅ Asegurar que es único
+            'price' => fake()->randomFloat(2, 1.00, 999.99), // ✅ Precio mínimo 1.00
+            'description' => fake()->sentence(),
+            'category_id' => Category::factory(), // ✅ Esto creará una categoría automáticamente
         ];
     }
 }
