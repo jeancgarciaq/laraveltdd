@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\TaskRepositoryInterface;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Task;
@@ -23,6 +24,11 @@ use Illuminate\Support\Facades\Auth;
 class TaskController extends Controller
 {
     /**
+     * @atribute @protected 
+     */
+    protected TaskRepositoryInterface $taskRepository;
+
+    /**
      * Constructor del controlador
      *
      * Configura la autorización automática de recursos usando políticas.
@@ -30,8 +36,9 @@ class TaskController extends Controller
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(TaskRepositoryInterface $taskRepository)
     {
+        $this->taskRepository = $taskRepository;
         $this->authorizeResource(Task::class, 'task');
     }
 
@@ -49,8 +56,9 @@ class TaskController extends Controller
      */
     public function index()
     {
-        // authorizeResource() automatically calls viewAny() policy method
-        $tasks = Auth::user()->tasks()->get();
+        // Establecer el usuario para el repositorio antes de cualquier operación
+        $tasks = $this->taskRepository->forUser(auth()->user())->getAllTasks();
+
         return view('tasks.index', compact('tasks'));
     }
 
@@ -88,8 +96,10 @@ class TaskController extends Controller
      */
     public function store(StoreTaskRequest $request)
     {
-        // authorizeResource() automatically calls create() policy method
-        $task = $request->user()->tasks()->create($request->validated());
+        
+        // Establecer el usuario y luego crear la tarea
+        $this->taskRepository->forUser($request->user())->createTask($request->validated());
+
         return redirect()->route('tasks.index')->with('success', 'Task created successfully!');
     }
 
@@ -106,7 +116,13 @@ class TaskController extends Controller
      */
     public function show(Task $task)
     {
-        // authorizeResource() automatically calls view() policy method
+        // Asegura que solo se busca la tarea del usuario actual
+        $task = $this->taskRepository->forUser(auth()->user())->findTaskById($id);
+        
+        if (!$task) {
+            abort(404);
+        }
+        
         return view('tasks.show', compact('task'));
     }
 
@@ -123,7 +139,19 @@ class TaskController extends Controller
      */
     public function edit(Task $task)
     {
-        // authorizeResource() automatically calls update() policy method
+        try {
+            // Aunque la política ya está en el repositorio, la llamamos para el formulario de edición
+            // o para asegurar que la tarea accedida a través de la inyección de modelo pertenece al usuario.
+            // Una forma es intentar una operacióndummy o un método específico de autorización en el repo.
+            // Para simplificar, si la Policy se usa en el repositorio, podrías depender de ella.
+            // Si el findTaskById() ya es scoped, esta llamada es menos crítica.
+            if ($task->user_id !== auth()->id()) { // Comprobación explícita para la vista
+                 throw new AuthorizationException('You are not authorized to view this task.');
+            }
+        } catch (AuthorizationException $e) {
+            abort(403, $e->getMessage());
+        }
+        
         return view('tasks.edit', compact('task'));
     }
 
@@ -148,9 +176,15 @@ class TaskController extends Controller
      */
     public function update(UpdateTaskRequest $request, Task $task)
     {
-        // authorizeResource() automatically calls update() policy method
-        $task->update($request->only(['title', 'description']));
-        return redirect()->route('tasks.index')->with('success', 'Task updated successfully!');
+        try {
+            // El repositorio ya tiene el usuario a través de forUser() si se usara globalmente,
+            // pero para update/delete sigue siendo mejor pasar el modelo completo
+            // para que la política pueda operar con él. La Policy sigue siendo la fuente de la verdad.
+            $this->taskRepository->updateTask(auth()->user(), $task, $request->validated()); // Seguir pasando el user para la policy en update/delete
+            return redirect()->route('tasks.index')->with('success', 'Task updated successfully!');
+        } catch (AuthorizationException $e) {
+            abort(403, $e->getMessage());
+        }
     }
 
     /**
@@ -169,8 +203,11 @@ class TaskController extends Controller
      */
     public function destroy(Task $task)
     {
-        // authorizeResource() automatically calls delete() policy method
-        $task->delete();
-        return redirect()->route('tasks.index')->with('success', 'Task deleted successfully!');
+        try {
+            $this->taskRepository->deleteTask(auth()->user(), $task); // Seguir pasando el user para la policy en update/delete
+            return redirect()->route('tasks.index')->with('success', 'Task deleted successfully!');
+        } catch (AuthorizationException $e) {
+            abort(403, $e->getMessage());
+        }
     }
 }
