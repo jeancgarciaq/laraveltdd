@@ -25,7 +25,7 @@ class UpdateTaskRequest extends FormRequest
     {
         return [
             'title.required' => 'The title field is required.',
-            'title.max' => 'The title may not be greater than 255 characters.',
+            'title.max' => 'The title field must not be greater than 255 characters.',
         ];
     }
 }
