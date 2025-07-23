@@ -20,6 +20,7 @@ class TaskManagementTest extends TestCase
 
         $this->assertDatabaseHas('tasks', ['id' => $task->id]);
 
+        // El controlador usará authorizeResource() que a su vez usa la política.
         $response = $this->actingAs($user)->delete(route('tasks.destroy', $task));
 
         $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
@@ -109,5 +110,83 @@ class TaskManagementTest extends TestCase
         $response = $this->actingAs($user1)->get(route('tasks.edit', $taskOfUser2));
 
         $response->assertForbidden(); // Debe denegar el acceso (403)
+    }
+
+    #[Test]
+    public function an_authenticated_user_can_view_the_create_task_page()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->get(route('tasks.create'));
+
+        $response->assertOk(); // HTTP 200 OK
+        $response->assertSee('Create New Task'); // Verificar título de la página
+        $response->assertSeeHtml('<form method="POST" action="' . route('tasks.store') . '">'); // Verificar que el formulario existe y apunta a la ruta correcta
+        $response->assertSee('<input type="text" id="title" name="title"', false); // Verificar campo de título
+        $response->assertSee('<textarea id="description" name="description"', false); // Verificar campo de descripción
+        $response->assertSee('<input type="hidden" name="_token"', false); // Verificar el token CSRF
+    }
+
+    #[Test]
+    public function guests_cannot_view_the_create_task_page()
+    {
+        $response = $this->get(route('tasks.create'));
+
+        $response->assertRedirect('/login'); // Redirigir al login
+        $response->assertStatus(302);
+    }
+
+    #[Test]
+    public function form_displays_validation_errors_for_missing_title()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->get(route('tasks.create'));
+
+        $response = $this->post(route('tasks.store'), [
+            'title' => '',
+            'description' => 'Some description',
+        ]);
+
+        $response->assertSessionHasErrors('title');
+        $response->assertStatus(302);
+
+        $response = $this->followRedirects($response);
+
+        $response->assertSee('The title field is required.');
+        $response->assertSeeHtml('<span class="error-message">The title field is required.</span>');
+        $response->assertSee('value="Some description"', false);
+        $response->assertSeeHtml('<textarea id="description" name="description">Some description</textarea>');
+
+        $this->assertDatabaseCount('tasks', 0);
+    }
+
+    #[Test]
+    public function form_displays_validation_errors_for_too_long_title()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->get(route('tasks.create'));
+
+        $longTitle = str_repeat('a', 256);
+        $response = $this->post(route('tasks.store'), [
+            'title' => $longTitle,
+            'description' => 'A valid description',
+        ]);
+
+        $response->assertSessionHasErrors('title');
+        $response->assertStatus(302);
+
+        $response = $this->followRedirects($response);
+
+        $response->assertSee('The title field must not be greater than 255 characters.');
+        $response->assertSeeHtml('<span class="error-message">The title field must not be greater than 255 characters.</span>');
+        $response->assertSee('value="' . $longTitle . '"', false);
+        $response->assertSeeHtml('<textarea id="description" name="description">A valid description</textarea>');
+
+        $this->assertDatabaseCount('tasks', 0);
     }
 }
